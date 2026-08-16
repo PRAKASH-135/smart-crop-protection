@@ -34,3 +34,27 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Datasets and media
+training/videos/
+training/raw_frames/
+training/raw_frames_batch2/
+training/raw_frames_batch2_labels/
+training/raw_frames_labels/
+training/public_dataset_raw/
+training/dataset/images/
+training/dataset/labels/
+training/sanity_check_output/
+training/sanity_check_farm_output/
+training/crop_protection_dataset.zip
+
+# Model weights
+*.pt
+
+# Virtual environments
+.venv/
+training/.venv/
+
+# Training run outputs
+training/runs/
+runs/
