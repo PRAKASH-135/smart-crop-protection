@@ -1,0 +1,37 @@
+crops:
+
+  rice:
+    harmful:
+      - cow
+      - monkey
+      - bird
+    harmless:
+      - dog
+      - goat
+
+  wheat:
+    harmful:
+      - cow
+      - monkey
+      - pig
+    harmless:
+      - dog
+      - goat
+
+  corn:
+    harmful:
+      - bird
+      - monkey
+      - pig
+    harmless:
+      - dog
+      - goat
+
+  tomato:
+    harmful:
+      - monkey
+      - bird
+      - pig
+    harmless:
+      - dog
+      - goat
