@@ -14,81 +14,69 @@ function CameraFeed({
 
   useEffect(() => {
 
-    const interval = setInterval(async () => {
+    let isMounted = true;
+    let timeoutId;
+
+    const captureAndDetect = async () => {
 
       if (webcamRef.current) {
 
         const screenshot =
           webcamRef.current.getScreenshot();
 
-        if (!screenshot) return;
+        if (screenshot) {
 
-        const blob = await fetch(screenshot)
-          .then(res => res.blob());
+          const blob = await fetch(screenshot)
+            .then(res => res.blob());
 
-        const formData = new FormData();
+          const formData = new FormData();
 
-        // send image
-        formData.append(
-          "image",
-          blob,
-          "frame.jpg"
-        );
+          formData.append("image", blob, "frame.jpg");
+          formData.append("crop", crop);
 
-        // send crop
-        formData.append(
-          "crop",
-          crop
-        );
+          try {
 
-        try {
+            const response = await axios.post(
+              "http://localhost:5000/api/analyze",
+              formData
+            );
 
-          const response = await axios.post(
-            "http://localhost:5000/api/analyze",
-            formData
-          );
+            if (isMounted) {
 
-          console.log(response.data);
+              setDetectedObject(response.data.detectedObject);
+              setConfidence(response.data.confidence);
+              setSiren(response.data.siren);
 
-          // update detection card
-          setDetectedObject(
-            response.data.detectedObject
-          );
+              setLogs(prev => [
+                {
+                  object: response.data.detectedObject,
+                  harmful: response.data.harmful
+                },
+                ...prev
+              ]);
 
-          setConfidence(
-            response.data.confidence
-          );
+            }
 
-          setSiren(
-            response.data.siren
-          );
-
-          // update logs
-          setLogs(prev => [
-            {
-              object:
-                response.data.detectedObject,
-
-              harmful:
-                response.data.harmful
-            },
-            ...prev
-          ]);
-
-        } catch (error) {
-
-          console.log(
-            "Frontend Error:",
-            error
-          );
+          } catch (error) {
+            console.log("Frontend Error:", error);
+          }
 
         }
 
       }
 
-    }, 4000);
+      if (isMounted) {
+        timeoutId = setTimeout(captureAndDetect, 800);
+      }
 
-    return () => clearInterval(interval);
+    };
+
+    captureAndDetect();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
 
   }, [crop]);
 

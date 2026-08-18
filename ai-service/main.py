@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 from fastapi import FastAPI, File, UploadFile
 from ultralytics import YOLO
@@ -15,7 +16,10 @@ async def detect(file: UploadFile = File(...)):
         buffer.write(await file.read())
 
     try:
+        start = time.time()
         results = model(file_location)
+        elapsed = time.time() - start
+        print(f"Inference time: {elapsed:.3f}s")
 
         detections = []
         for r in results:
