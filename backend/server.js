@@ -50,39 +50,51 @@ app.post(
         }
       );
 
-      const detectedObject =
-        response.data.label || "none";
+      const detections = response.data.detections || [];
 
-      const harmful =
-        rules[crop]?.includes(
-          detectedObject.toLowerCase()
-        ) || false;
+      let detectedObject = "none";
+      let confidence = 0;
+      let harmful = false;
+
+      if (detections.length > 0) {
+        const harmfulDetection = detections.find((d) =>
+          rules[crop]?.includes(d.label.toLowerCase())
+        );
+
+        if (harmfulDetection) {
+          detectedObject = harmfulDetection.label;
+          confidence = harmfulDetection.confidence;
+          harmful = true;
+        } else {
+          const topDetection = detections.reduce((a, b) =>
+            a.confidence > b.confidence ? a : b
+          );
+          detectedObject = topDetection.label;
+          confidence = topDetection.confidence;
+          harmful = false;
+        }
+      }
 
       console.log({
         crop,
         detectedObject,
-        harmful
+        harmful,
+        totalDetections: detections.length
       });
 
       await Log.create({
-
-  object: detectedObject,
-
-  crop,
-
-  harmful,
-
-  confidence:
-    response.data.confidence
-
-});
+        object: detectedObject,
+        crop,
+        harmful,
+        confidence
+      });
 
       res.json({
         detectedObject,
-        confidence:
-          response.data.confidence,
+        confidence,
         harmful,
-        siren: harmful
+        siren: harmful,
+        allDetections: detections
       });
 
     } catch (error) {

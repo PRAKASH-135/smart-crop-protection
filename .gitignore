@@ -58,3 +58,6 @@ training/.venv/
 # Training run outputs
 training/runs/
 runs/
+training/comparison_output/
+training/weak_classes_raw/
+training/*.zip

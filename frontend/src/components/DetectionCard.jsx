@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import sirenSound from "../assets/siren.mp3";
 
 function DetectionCard({
@@ -7,15 +7,30 @@ function DetectionCard({
   siren
 }) {
 
-  useEffect(() => {
+  const audioRef = useRef(null);
 
-    const audio =
-      new Audio(sirenSound);
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(sirenSound);
+      audioRef.current.loop = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
     if (siren) {
-      audio.play();
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
     }
 
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
   }, [siren]);
 
   return (
