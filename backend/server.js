@@ -31,13 +31,20 @@ setInterval(loadRules, 30000);
 
 const activeTracks = new Map();
 const TRACK_TIMEOUT_MS = 5000;
+const HIGH_THREAT_SECONDS = 10;
 
 app.post("/api/analyze", upload.single("image"), async (req, res) => {
+
+  let detectedObject = "none";
+  let confidence = 0;
+  let harmful = false;
+  let threatLevel = "SAFE";
 
   try {
 
     const crop = req.body.crop;
     const zone = req.body.zone ? JSON.parse(req.body.zone) : null;
+    const now = Date.now();
 
     const formData = new FormData();
     formData.append("file", fs.createReadStream(req.file.path));
@@ -66,9 +73,24 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
 
     const zoneDetections = detections.filter(inZone);
 
-    let detectedObject = "none";
-    let confidence = 0;
-    let harmful = false;
+    for (const [id, t] of activeTracks.entries()) {
+      if (now - t.lastSeen > TRACK_TIMEOUT_MS) {
+        activeTracks.delete(id);
+      }
+    }
+
+    const newSightings = [];
+    for (const d of zoneDetections) {
+      if (d.trackId !== null && d.trackId !== undefined) {
+        if (!activeTracks.has(d.trackId)) {
+          newSightings.push(d);
+          activeTracks.set(d.trackId, { firstSeen: now, lastSeen: now });
+        } else {
+          const t = activeTracks.get(d.trackId);
+          t.lastSeen = now;
+        }
+      }
+    }
 
     if (zoneDetections.length > 0) {
       const harmfulDetection = zoneDetections.find((d) =>
@@ -79,6 +101,10 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
         detectedObject = harmfulDetection.label;
         confidence = harmfulDetection.confidence;
         harmful = true;
+
+        const track = activeTracks.get(harmfulDetection.trackId);
+        const dwellSeconds = track ? (now - track.firstSeen) / 1000 : 0;
+        threatLevel = dwellSeconds >= HIGH_THREAT_SECONDS ? "HIGH" : "WARNING";
       } else {
         const topDetection = zoneDetections.reduce((a, b) =>
           a.confidence > b.confidence ? a : b
@@ -86,24 +112,6 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
         detectedObject = topDetection.label;
         confidence = topDetection.confidence;
         harmful = false;
-      }
-    }
-
-    const now = Date.now();
-
-    for (const [id, lastSeen] of activeTracks.entries()) {
-      if (now - lastSeen > TRACK_TIMEOUT_MS) {
-        activeTracks.delete(id);
-      }
-    }
-
-    const newSightings = [];
-    for (const d of zoneDetections) {
-      if (d.trackId !== null && d.trackId !== undefined) {
-        if (!activeTracks.has(d.trackId)) {
-          newSightings.push(d);
-        }
-        activeTracks.set(d.trackId, now);
       }
     }
 
@@ -119,7 +127,7 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
         trackId: sighting.trackId,
         boundingBox: sighting.boundingBox,
         insideCropZone: true,
-        threatLevel: sightingHarmful ? "HIGH" : "SAFE",
+        threatLevel: sightingHarmful ? "WARNING" : "SAFE",
         sirenActivated: sightingHarmful
       });
     }
@@ -128,6 +136,7 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
       crop,
       detectedObject,
       harmful,
+      threatLevel,
       totalDetections: zoneDetections.length
     });
 
@@ -135,6 +144,7 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
       detectedObject,
       confidence,
       harmful,
+      threatLevel,
       siren: harmful,
       allDetections: zoneDetections
     });
