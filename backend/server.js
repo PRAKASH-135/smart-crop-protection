@@ -8,6 +8,8 @@ const mongoose = require("mongoose");
 const Log = require("./models/Log");
 
 const app = express();
+const activeTracks = new Map();
+const TRACK_TIMEOUT_MS = 5000;
 
 app.use(cors());
 
@@ -74,6 +76,23 @@ app.post(
           harmful = false;
         }
       }
+            const now = Date.now();
+
+      for (const [id, lastSeen] of activeTracks.entries()) {
+        if (now - lastSeen > TRACK_TIMEOUT_MS) {
+          activeTracks.delete(id);
+        }
+      }
+
+      const newSightings = [];
+      for (const d of detections) {
+        if (d.trackId !== null && d.trackId !== undefined) {
+          if (!activeTracks.has(d.trackId)) {
+            newSightings.push(d);
+          }
+          activeTracks.set(d.trackId, now);
+        }
+      }
 
       console.log({
         crop,
@@ -81,14 +100,18 @@ app.post(
         harmful,
         totalDetections: detections.length
       });
+      for (const sighting of newSightings) {
+        const sightingHarmful =
+          rules[crop]?.includes(sighting.label.toLowerCase()) || false;
 
-      await Log.create({
-        object: detectedObject,
-        crop,
-        harmful,
-        confidence
-      });
-
+        await Log.create({
+          object: sighting.label,
+          crop,
+          harmful: sightingHarmful,
+          confidence: sighting.confidence
+        });
+      }
+      
       res.json({
         detectedObject,
         confidence,
