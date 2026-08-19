@@ -6,6 +6,7 @@ const FormData = require("form-data");
 const fs = require("fs");
 const mongoose = require("mongoose");
 const Log = require("./models/Log");
+const Crop = require("./models/Crop");
 
 const app = express();
 
@@ -17,12 +18,16 @@ mongoose.connect(
 
 const upload = multer({ dest: "uploads/" });
 
-const rules = {
-  rice: ["cow", "monkey", "bird"],
-  wheat: ["cow", "monkey", "pig"],
-  corn: ["bird", "monkey", "pig"],
-  tomato: ["monkey", "bird", "pig"]
-};
+let rulesCache = {};
+
+async function loadRules() {
+  const crops = await Crop.find();
+  rulesCache = {};
+  crops.forEach(c => { rulesCache[c.name] = c.harmful; });
+}
+
+loadRules();
+setInterval(loadRules, 30000);
 
 const activeTracks = new Map();
 const TRACK_TIMEOUT_MS = 5000;
@@ -67,7 +72,7 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
 
     if (zoneDetections.length > 0) {
       const harmfulDetection = zoneDetections.find((d) =>
-        rules[crop]?.includes(d.label.toLowerCase())
+        rulesCache[crop]?.includes(d.label.toLowerCase())
       );
 
       if (harmfulDetection) {
@@ -104,13 +109,18 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
 
     for (const sighting of newSightings) {
       const sightingHarmful =
-        rules[crop]?.includes(sighting.label.toLowerCase()) || false;
+        rulesCache[crop]?.includes(sighting.label.toLowerCase()) || false;
 
       await Log.create({
         object: sighting.label,
         crop,
         harmful: sightingHarmful,
-        confidence: sighting.confidence
+        confidence: sighting.confidence,
+        trackId: sighting.trackId,
+        boundingBox: sighting.boundingBox,
+        insideCropZone: true,
+        threatLevel: sightingHarmful ? "HIGH" : "SAFE",
+        sirenActivated: sightingHarmful
       });
     }
 
