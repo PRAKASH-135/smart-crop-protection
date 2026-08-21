@@ -12,6 +12,8 @@ function CameraFeed({
 
   const webcamRef = useRef(null);
   const [zone, setZone] = useState({ top: 20, left: 20, width: 60, height: 60 });
+  const [boxes, setBoxes] = useState([]);
+  const [imgSize, setImgSize] = useState({ w: 640, h: 480 });
 
   useEffect(() => {
 
@@ -48,6 +50,11 @@ function CameraFeed({
               setDetectedObject(response.data.detectedObject);
               setConfidence(response.data.confidence);
               setSiren(response.data.siren);
+              setBoxes(response.data.allDetections || []);
+              setImgSize({
+                w: response.data.imageWidth || 640,
+                h: response.data.imageHeight || 480
+              });
 
               setLogs(prev => [
                 {
@@ -117,6 +124,45 @@ function CameraFeed({
             pointerEvents: "none"
           }}
         />
+
+        {boxes.map((b, i) => {
+          const left = (b.boundingBox.x1 / imgSize.w) * 100;
+          const top = (b.boundingBox.y1 / imgSize.h) * 100;
+          const width = ((b.boundingBox.x2 - b.boundingBox.x1) / imgSize.w) * 100;
+          const height = ((b.boundingBox.y2 - b.boundingBox.y1) / imgSize.h) * 100;
+          const color = b.isHarmful ? "#ef4444" : "#22c55e";
+
+          return (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                top: `${top}%`,
+                left: `${left}%`,
+                width: `${width}%`,
+                height: `${height}%`,
+                border: `2px solid ${color}`,
+                pointerEvents: "none"
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-20px",
+                  left: "0",
+                  background: color,
+                  color: "#000",
+                  fontSize: "11px",
+                  padding: "1px 6px",
+                  borderRadius: "4px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {b.label} {(b.confidence * 100).toFixed(0)}%
+              </span>
+            </div>
+          );
+        })}
 
       </div>
 

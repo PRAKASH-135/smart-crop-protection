@@ -133,7 +133,7 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
       if (d.trackId !== null && d.trackId !== undefined) {
         const isIntruderNow = d.label === "person"
           ? d.isOwner === false
-          : rulesCache[req.body.crop]?.includes(d.label.toLowerCase()) || false;
+          : rulesCache[crop]?.includes(d.label.toLowerCase()) || false;
 
         if (!activeTracks.has(d.trackId)) {
           newSightings.push(d);
@@ -212,13 +212,22 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
       }
     }
 
+    const annotatedDetections = zoneDetections.map(d => ({
+      ...d,
+      isHarmful: d.label === "person"
+        ? d.isOwner === false
+        : rulesCache[crop]?.includes(d.label.toLowerCase()) || false
+    }));
+
     res.json({
       detectedObject,
       confidence,
       harmful,
       threatLevel,
       siren: harmful,
-      allDetections: zoneDetections
+      allDetections: annotatedDetections,
+      imageWidth: imgW,
+      imageHeight: imgH
     });
 
   } catch (error) {
@@ -238,6 +247,35 @@ app.get("/api/logs", async (req, res) => {
     res.json(logs);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch logs" });
+  }
+});
+
+app.get("/api/analytics/detailed", async (req, res) => {
+  try {
+    const byObject = await Log.aggregate([
+      { $match: { harmful: true } },
+      { $group: { _id: "$object", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const byDay = await Log.aggregate([
+      { $match: { time: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$time" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.json({ byObject, byDay });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch detailed analytics" });
   }
 });
 

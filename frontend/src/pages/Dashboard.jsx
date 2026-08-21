@@ -1,4 +1,6 @@
 import { useState } from "react";
+import StatRow from "../components/StatRow";
+import ThreatCharts from "../components/ThreatCharts";
 import Topbar from "../components/Topbar";
 import CameraFeed from "../components/CameraFeed";
 import DetectionCard from "../components/DetectionCard";
@@ -14,10 +16,13 @@ function Dashboard() {
 
   return (
     <div className="p-6 overflow-auto bg-[#07111f] text-white min-h-screen">
-      <Topbar
+           <Topbar
         crop={crop}
         setCrop={setCrop}
       />
+      <div className="mt-4">
+        <StatRow />
+      </div>
       <div className="grid grid-cols-3 gap-4 mt-4">
         <div className="col-span-2">
           <CameraFeed
@@ -29,20 +34,24 @@ function Dashboard() {
           />
         </div>
         <div>
-          <DetectionCard
+                    <DetectionCard
             detectedObject={detectedObject}
             confidence={confidence}
             siren={siren}
+            crop={crop}
           />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-3 gap-4 mt-4">
         <div className="col-span-2">
           <LogsTable logs={logs} />
         </div>
         <div>
           <Analytics />
         </div>
+      </div>
+      <div className="mt-4">
+        <ThreatCharts />
       </div>
     </div>
   );
