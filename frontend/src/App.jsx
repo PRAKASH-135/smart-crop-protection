@@ -6,14 +6,15 @@ import Logs from "./pages/Logs";
 function App() {
   return (
     <BrowserRouter>
-      <div className="flex">
+      <div className="app-shell">
         <Sidebar />
-        <div className="flex-1">
+
+        <main className="main-content">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/logs" element={<Logs />} />
           </Routes>
-        </div>
+        </main>
       </div>
     </BrowserRouter>
   );

@@ -1,36 +1,104 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import {
+  Crosshair,
+  Warning,
+  BellRinging,
+  Siren,
+  VideoCamera,
+} from "@phosphor-icons/react";
 
 function StatRow() {
-  const [stats, setStats] = useState({ total: 0, harmful: 0, safe: 0 });
+  const [stats, setStats] = useState({
+    total: 0,
+    harmful: 0,
+    safe: 0,
+  });
 
   useEffect(() => {
     const fetchStats = () => {
       axios
         .get("http://localhost:5000/api/analytics")
-        .then(res => setStats(res.data))
-        .catch(err => console.log("Stats fetch error:", err.message));
+        .then((res) => {
+          setStats(res.data);
+        })
+        .catch((err) => {
+          console.log(
+            "Stats fetch error:",
+            err.message
+          );
+        });
     };
+
     fetchStats();
+
     const interval = setInterval(fetchStats, 5000);
+
     return () => clearInterval(interval);
   }, []);
 
   const cards = [
-    { label: "Total Detections", value: stats.total, color: "text-white" },
-    { label: "Threats Detected", value: stats.harmful, color: "text-red-400" },
-    { label: "Safe Detections", value: stats.safe, color: "text-green-400" }
+    {
+      label: "Total Detections",
+      value: stats.total,
+      icon: Crosshair,
+      change: "Live monitoring",
+    },
+    {
+      label: "Threats Detected",
+      value: stats.harmful,
+      icon: Warning,
+      change: "Requires attention",
+    },
+    {
+      label: "Alerts Triggered",
+      value: stats.harmful,
+      icon: BellRinging,
+      change: "AI generated",
+    },
+    {
+      label: "Siren Activations",
+      value: stats.harmful,
+      icon: Siren,
+      change: "Automatic response",
+    },
+    {
+      label: "Active Cameras",
+      value: "1 / 1",
+      icon: VideoCamera,
+      change: "Online",
+    },
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-4">
-      {cards.map((c) => (
-        <div key={c.label} className="bg-[#0b1727] rounded-xl p-4 border border-gray-800 shadow-lg">
-          <p className="text-gray-400 text-sm">{c.label}</p>
-          <h3 className={`text-3xl font-bold mt-1 ${c.color}`}>{c.value}</h3>
-        </div>
-      ))}
-    </div>
+    <section className="stats-grid">
+      {cards.map((card) => {
+        const Icon = card.icon;
+
+        return (
+          <div className="stat-card" key={card.label}>
+            <div className="stat-icon">
+              <Icon size={25} weight="duotone" />
+            </div>
+
+            <div>
+              <div className="stat-label">
+                {card.label}
+              </div>
+
+              <div className="stat-value">
+                {card.value}
+              </div>
+
+              <div className="stat-change">
+                {card.change}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </section>
   );
 }
+
 export default StatRow;

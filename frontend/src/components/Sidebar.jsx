@@ -1,44 +1,80 @@
 import {
-  FaTachometerAlt,
-  FaVideo,
-  FaHistory,
-  FaChartBar
-} from "react-icons/fa";
-import { Link } from "react-router-dom";
+  House,
+  Monitor,
+  ClipboardText,
+  ChartBar,
+  Camera,
+  ShieldCheck,
+  Bell,
+  Gear,
+  Leaf,
+} from "@phosphor-icons/react";
+import { NavLink } from "react-router-dom";
 
 function Sidebar() {
+  const items = [
+    { label: "Dashboard", icon: House, path: "/" },
+    { label: "Live Monitor", icon: Monitor, path: "/" },
+    { label: "Detection Logs", icon: ClipboardText, path: "/logs" },
+    { label: "Analytics", icon: ChartBar, path: "/" },
+    { label: "Cameras", icon: Camera, path: "/" },
+    { label: "Crop Rules", icon: ShieldCheck, path: "/" },
+    { label: "Alerts", icon: Bell, path: "/" },
+    { label: "Settings", icon: Gear, path: "/" },
+  ];
+
   return (
-    <div className="w-64 bg-[#0b1727] p-6 border-r border-gray-800">
-      <h1 className="text-2xl font-bold text-green-400 mb-12">
-        🌾 AI Crop Protection
-      </h1>
-      <ul className="space-y-6">
-        <li>
-          <Link to="/" className="flex items-center gap-3 text-lg hover:text-green-400 cursor-pointer transition-all">
-            <FaTachometerAlt />
-            Dashboard
-          </Link>
-        </li>
-        <li>
-          <Link to="/" className="flex items-center gap-3 text-lg hover:text-green-400 cursor-pointer transition-all">
-            <FaVideo />
-            Live Monitor
-          </Link>
-        </li>
-        <li>
-          <Link to="/logs" className="flex items-center gap-3 text-lg hover:text-green-400 cursor-pointer transition-all">
-            <FaHistory />
-            Logs
-          </Link>
-        </li>
-        <li>
-          <Link to="/" className="flex items-center gap-3 text-lg hover:text-green-400 cursor-pointer transition-all">
-            <FaChartBar />
-            Analytics
-          </Link>
-        </li>
-      </ul>
-    </div>
+    <aside className="app-sidebar">
+      <div className="sidebar-brand">
+        <div className="header-brand">
+          <div className="brand-logo">
+            <Leaf size={24} weight="duotone" />
+          </div>
+
+          <div>
+            <div className="sidebar-brand-title">
+              AI CROP PROTECTION
+            </div>
+
+            <div className="sidebar-brand-subtitle">
+              Intelligent Intrusion Alert System
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <nav className="sidebar-nav">
+        {items.map(({ label, icon: Icon, path }) => (
+          <NavLink
+            key={label}
+            to={path}
+            end={label === "Dashboard"}
+            className={({ isActive }) =>
+              `sidebar-item ${isActive ? "active" : ""}`
+            }
+          >
+            <span className="sidebar-icon">
+              <Icon size={21} weight="duotone" />
+            </span>
+
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="sidebar-footer">
+        <div className="sidebar-footer-title">
+          Smart Farming
+        </div>
+
+        <div className="sidebar-footer-text">
+          Better Protection
+          <br />
+          Better Tomorrow
+        </div>
+      </div>
+    </aside>
   );
 }
+
 export default Sidebar;
