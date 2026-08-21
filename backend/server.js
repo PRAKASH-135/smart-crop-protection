@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
@@ -5,8 +7,13 @@ const axios = require("axios");
 const FormData = require("form-data");
 const fs = require("fs");
 const mongoose = require("mongoose");
+const nodemailer = require("nodemailer");
 const Log = require("./models/Log");
 const Crop = require("./models/Crop");
+
+console.log("GMAIL_USER loaded:", process.env.GMAIL_USER);
+console.log("APP_PASSWORD loaded:", process.env.GMAIL_APP_PASSWORD ? "yes (hidden)" : "MISSING");
+console.log("OWNER_EMAIL loaded:", process.env.OWNER_EMAIL);
 
 const app = express();
 
@@ -33,6 +40,50 @@ const activeTracks = new Map();
 const TRACK_TIMEOUT_MS = 5000;
 const HIGH_THREAT_SECONDS = 10;
 
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD
+  }
+});
+
+let lastEmailSent = 0;
+const EMAIL_COOLDOWN_MS = 60000;
+
+async function sendAlertEmail(objectLabel, crop, threatLevel, imagePath) {
+  const now = Date.now();
+  if (now - lastEmailSent < EMAIL_COOLDOWN_MS) {
+    console.log("Email skipped (cooldown active).");
+    return;
+  }
+  lastEmailSent = now;
+
+  const detectedTime = new Date().toLocaleString();
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: process.env.OWNER_EMAIL,
+      subject: `Crop Alert: ${objectLabel} detected (${threatLevel})`,
+      text: `A ${objectLabel} was detected in your ${crop} field.\nThreat level: ${threatLevel}\nTime: ${detectedTime}`,
+      attachments: imagePath ? [
+        {
+          filename: "detection.jpg",
+          path: imagePath
+        }
+      ] : []
+    });
+    console.log("Alert email sent. Full response:");
+    console.log("  accepted:", info.accepted);
+    console.log("  rejected:", info.rejected);
+    console.log("  response:", info.response);
+    console.log("  messageId:", info.messageId);
+  } catch (err) {
+    console.log("Email send failed:", err.message);
+  }
+}
+
 app.post("/api/analyze", upload.single("image"), async (req, res) => {
 
   let detectedObject = "none";
@@ -57,8 +108,6 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
       }
     );
 
-    fs.unlink(req.file.path, () => {});
-
     const detections = response.data.detections || [];
     const imgW = response.data.imageWidth || 640;
     const imgH = response.data.imageHeight || 480;
@@ -82,20 +131,31 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
     const newSightings = [];
     for (const d of zoneDetections) {
       if (d.trackId !== null && d.trackId !== undefined) {
+        const isIntruderNow = d.label === "person"
+          ? d.isOwner === false
+          : rulesCache[req.body.crop]?.includes(d.label.toLowerCase()) || false;
+
         if (!activeTracks.has(d.trackId)) {
           newSightings.push(d);
-          activeTracks.set(d.trackId, { firstSeen: now, lastSeen: now });
+          activeTracks.set(d.trackId, { firstSeen: now, lastSeen: now, wasHarmful: isIntruderNow });
         } else {
           const t = activeTracks.get(d.trackId);
+          if (isIntruderNow && !t.wasHarmful) {
+            newSightings.push(d);
+          }
           t.lastSeen = now;
+          t.wasHarmful = isIntruderNow;
         }
       }
     }
 
     if (zoneDetections.length > 0) {
-      const harmfulDetection = zoneDetections.find((d) =>
-        rulesCache[crop]?.includes(d.label.toLowerCase())
-      );
+      const harmfulDetection = zoneDetections.find((d) => {
+        if (d.label === "person") {
+          return d.isOwner === false;
+        }
+        return rulesCache[crop]?.includes(d.label.toLowerCase());
+      });
 
       if (harmfulDetection) {
         detectedObject = harmfulDetection.label;
@@ -115,30 +175,42 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
       }
     }
 
-    for (const sighting of newSightings) {
-      const sightingHarmful =
-        rulesCache[crop]?.includes(sighting.label.toLowerCase()) || false;
-
-      await Log.create({
-        object: sighting.label,
-        crop,
-        harmful: sightingHarmful,
-        confidence: sighting.confidence,
-        trackId: sighting.trackId,
-        boundingBox: sighting.boundingBox,
-        insideCropZone: true,
-        threatLevel: sightingHarmful ? "WARNING" : "SAFE",
-        sirenActivated: sightingHarmful
-      });
-    }
+    const personDetections = zoneDetections.filter(d => d.label === "person");
 
     console.log({
       crop,
       detectedObject,
       harmful,
       threatLevel,
-      totalDetections: zoneDetections.length
+      totalDetections: zoneDetections.length,
+      persons: personDetections.map(p => ({
+        isOwner: p.isOwner,
+        faceConfidence: p.faceConfidence
+      }))
     });
+
+    for (const sighting of newSightings) {
+      const isIntruder = sighting.label === "person"
+        ? sighting.isOwner === false
+        : rulesCache[crop]?.includes(sighting.label.toLowerCase()) || false;
+
+      await Log.create({
+        object: sighting.label,
+        crop,
+        harmful: isIntruder,
+        confidence: sighting.confidence,
+        trackId: sighting.trackId,
+        boundingBox: sighting.boundingBox,
+        insideCropZone: true,
+        threatLevel: isIntruder ? "WARNING" : "SAFE",
+        sirenActivated: isIntruder
+      });
+
+      if (isIntruder) {
+        console.log("Triggering email for:", sighting.label);
+        await sendAlertEmail(sighting.label, crop, "WARNING", req.file.path);
+      }
+    }
 
     res.json({
       detectedObject,
@@ -152,6 +224,10 @@ app.post("/api/analyze", upload.single("image"), async (req, res) => {
   } catch (error) {
     console.log("Backend Error:", error.message);
     res.status(500).json({ error: "Detection failed" });
+  } finally {
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
   }
 
 });
