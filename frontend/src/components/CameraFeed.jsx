@@ -1,5 +1,5 @@
 import Webcam from "react-webcam";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import axios from "axios";
 
 function CameraFeed({
@@ -11,6 +11,7 @@ function CameraFeed({
 }) {
 
   const webcamRef = useRef(null);
+  const [zone, setZone] = useState({ top: 20, left: 20, width: 60, height: 60 });
 
   useEffect(() => {
 
@@ -33,6 +34,7 @@ function CameraFeed({
 
           formData.append("image", blob, "frame.jpg");
           formData.append("crop", crop);
+          formData.append("zone", JSON.stringify(zone));
 
           try {
 
@@ -78,7 +80,7 @@ function CameraFeed({
       clearTimeout(timeoutId);
     };
 
-  }, [crop]);
+  }, [crop, zone]);
 
   return (
 
@@ -96,11 +98,34 @@ function CameraFeed({
 
       </div>
 
-      <Webcam
-        ref={webcamRef}
-        screenshotFormat="image/jpeg"
-        className="rounded-2xl w-full h-[350px] object-cover"
-      />
+      <div style={{ position: "relative" }}>
+
+        <Webcam
+          ref={webcamRef}
+          screenshotFormat="image/jpeg"
+          className="rounded-2xl w-full h-[350px] object-cover"
+        />
+
+        <div
+          style={{
+            position: "absolute",
+            top: `${zone.top}%`,
+            left: `${zone.left}%`,
+            width: `${zone.width}%`,
+            height: `${zone.height}%`,
+            border: "3px solid red",
+            pointerEvents: "none"
+          }}
+        />
+
+      </div>
+
+      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+        <label>Top% <input type="number" value={zone.top} onChange={e => setZone({...zone, top: +e.target.value})} style={{width:"50px"}}/></label>
+        <label>Left% <input type="number" value={zone.left} onChange={e => setZone({...zone, left: +e.target.value})} style={{width:"50px"}}/></label>
+        <label>W% <input type="number" value={zone.width} onChange={e => setZone({...zone, width: +e.target.value})} style={{width:"50px"}}/></label>
+        <label>H% <input type="number" value={zone.height} onChange={e => setZone({...zone, height: +e.target.value})} style={{width:"50px"}}/></label>
+      </div>
 
     </div>
   );
