@@ -1,5 +1,5 @@
 import Webcam from "react-webcam";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import axios from "axios";
 
 function CameraFeed({
@@ -11,86 +11,83 @@ function CameraFeed({
 }) {
 
   const webcamRef = useRef(null);
+  const [zone, setZone] = useState({ top: 20, left: 20, width: 60, height: 60 });
+  const [boxes, setBoxes] = useState([]);
+  const [imgSize, setImgSize] = useState({ w: 640, h: 480 });
 
   useEffect(() => {
 
-    const interval = setInterval(async () => {
+    let isMounted = true;
+    let timeoutId;
+
+    const captureAndDetect = async () => {
 
       if (webcamRef.current) {
 
         const screenshot =
           webcamRef.current.getScreenshot();
 
-        if (!screenshot) return;
+        if (screenshot) {
 
-        const blob = await fetch(screenshot)
-          .then(res => res.blob());
+          const blob = await fetch(screenshot)
+            .then(res => res.blob());
 
-        const formData = new FormData();
+          const formData = new FormData();
 
-        // send image
-        formData.append(
-          "image",
-          blob,
-          "frame.jpg"
-        );
+          formData.append("image", blob, "frame.jpg");
+          formData.append("crop", crop);
+          formData.append("zone", JSON.stringify(zone));
 
-        // send crop
-        formData.append(
-          "crop",
-          crop
-        );
+          try {
 
-        try {
+            const response = await axios.post(
+              "http://localhost:5000/api/analyze",
+              formData
+            );
 
-          const response = await axios.post(
-            "http://localhost:5000/api/analyze",
-            formData
-          );
+            if (isMounted) {
 
-          console.log(response.data);
+              setDetectedObject(response.data.detectedObject);
+              setConfidence(response.data.confidence);
+              setSiren(response.data.siren);
+              setBoxes(response.data.allDetections || []);
+              setImgSize({
+                w: response.data.imageWidth || 640,
+                h: response.data.imageHeight || 480
+              });
 
-          // update detection card
-          setDetectedObject(
-            response.data.detectedObject
-          );
+              setLogs(prev => [
+                {
+                  object: response.data.detectedObject,
+                  harmful: response.data.harmful
+                },
+                ...prev
+              ]);
 
-          setConfidence(
-            response.data.confidence
-          );
+            }
 
-          setSiren(
-            response.data.siren
-          );
-
-          // update logs
-          setLogs(prev => [
-            {
-              object:
-                response.data.detectedObject,
-
-              harmful:
-                response.data.harmful
-            },
-            ...prev
-          ]);
-
-        } catch (error) {
-
-          console.log(
-            "Frontend Error:",
-            error
-          );
+          } catch (error) {
+            console.log("Frontend Error:", error);
+          }
 
         }
 
       }
 
-    }, 4000);
+      if (isMounted) {
+        timeoutId = setTimeout(captureAndDetect, 800);
+      }
 
-    return () => clearInterval(interval);
+    };
 
-  }, [crop]);
+    captureAndDetect();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+
+  }, [crop, zone]);
 
   return (
 
@@ -108,11 +105,73 @@ function CameraFeed({
 
       </div>
 
-      <Webcam
-        ref={webcamRef}
-        screenshotFormat="image/jpeg"
-        className="rounded-2xl w-full h-[350px] object-cover"
-      />
+      <div style={{ position: "relative" }}>
+
+        <Webcam
+          ref={webcamRef}
+          screenshotFormat="image/jpeg"
+          className="rounded-2xl w-full h-[350px] object-cover"
+        />
+
+        <div
+          style={{
+            position: "absolute",
+            top: `${zone.top}%`,
+            left: `${zone.left}%`,
+            width: `${zone.width}%`,
+            height: `${zone.height}%`,
+            border: "3px solid red",
+            pointerEvents: "none"
+          }}
+        />
+
+        {boxes.map((b, i) => {
+          const left = (b.boundingBox.x1 / imgSize.w) * 100;
+          const top = (b.boundingBox.y1 / imgSize.h) * 100;
+          const width = ((b.boundingBox.x2 - b.boundingBox.x1) / imgSize.w) * 100;
+          const height = ((b.boundingBox.y2 - b.boundingBox.y1) / imgSize.h) * 100;
+          const color = b.isHarmful ? "#ef4444" : "#22c55e";
+
+          return (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                top: `${top}%`,
+                left: `${left}%`,
+                width: `${width}%`,
+                height: `${height}%`,
+                border: `2px solid ${color}`,
+                pointerEvents: "none"
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-20px",
+                  left: "0",
+                  background: color,
+                  color: "#000",
+                  fontSize: "11px",
+                  padding: "1px 6px",
+                  borderRadius: "4px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {b.label} {(b.confidence * 100).toFixed(0)}%
+              </span>
+            </div>
+          );
+        })}
+
+      </div>
+
+      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+        <label>Top% <input type="number" value={zone.top} onChange={e => setZone({...zone, top: +e.target.value})} style={{width:"50px"}}/></label>
+        <label>Left% <input type="number" value={zone.left} onChange={e => setZone({...zone, left: +e.target.value})} style={{width:"50px"}}/></label>
+        <label>W% <input type="number" value={zone.width} onChange={e => setZone({...zone, width: +e.target.value})} style={{width:"50px"}}/></label>
+        <label>H% <input type="number" value={zone.height} onChange={e => setZone({...zone, height: +e.target.value})} style={{width:"50px"}}/></label>
+      </div>
 
     </div>
   );
