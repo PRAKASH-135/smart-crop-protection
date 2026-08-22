@@ -1,9 +1,13 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] =
+    useState("");
 
   const [showPassword, setShowPassword] =
     useState(false);
@@ -34,7 +38,9 @@ function Login() {
     try {
       setLoading(true);
 
-      console.log("Sending login request...");
+      console.log(
+        "Sending login request..."
+      );
 
       const response = await axios.post(
         "http://localhost:5000/api/auth/login",
@@ -49,6 +55,10 @@ function Login() {
         response.data
       );
 
+      /* =================================
+         SAVE LOGIN INFORMATION
+         ================================= */
+
       localStorage.setItem(
         "token",
         response.data.token
@@ -56,12 +66,18 @@ function Login() {
 
       localStorage.setItem(
         "user",
-        JSON.stringify(response.data.user)
+        JSON.stringify(
+          response.data.user
+        )
       );
 
-      alert("Login successful!");
+      /* =================================
+         DIRECT DASHBOARD REDIRECT
+         ================================= */
 
-      window.location.href = "/";
+      navigate("/", {
+        replace: true,
+      });
 
     } catch (error) {
 
@@ -121,15 +137,15 @@ function Login() {
 
           </div>
 
-          {/* ERROR */}
-
           {error && (
             <div className="login-error">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleLogin}>
+          <form
+            onSubmit={handleLogin}
+          >
 
             {/* EMAIL */}
 
@@ -142,7 +158,9 @@ function Login() {
               placeholder="Enter your email"
               value={email}
               onChange={(e) =>
-                setEmail(e.target.value)
+                setEmail(
+                  e.target.value
+                )
               }
             />
 
@@ -163,7 +181,9 @@ function Login() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) =>
-                  setPassword(e.target.value)
+                  setPassword(
+                    e.target.value
+                  )
                 }
               />
 
@@ -207,7 +227,7 @@ function Login() {
 
             </div>
 
-            {/* LOGIN BUTTON */}
+            {/* LOGIN */}
 
             <button
               type="submit"
@@ -233,16 +253,12 @@ function Login() {
 
           </div>
 
-          {/* GOOGLE */}
-
           <button
             type="button"
             className="social-button"
           >
             G&nbsp;&nbsp; Continue with Google
           </button>
-
-          {/* MICROSOFT */}
 
           <button
             type="button"
@@ -260,8 +276,7 @@ function Login() {
             <button
               type="button"
               onClick={() =>
-                window.location.href =
-                  "/register"
+                navigate("/register")
               }
             >
               Register

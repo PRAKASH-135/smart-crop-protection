@@ -9,6 +9,7 @@ import {
   Gear,
   Leaf,
   SignOut,
+  Blueprint,
 } from "@phosphor-icons/react";
 
 import {
@@ -39,6 +40,11 @@ function Sidebar() {
       label: "Crop Rules",
       icon: ShieldCheck,
       path: "/crop-rules",
+    },
+    {
+      label: "Setup",
+      icon: Blueprint,
+      path: "/setup",
     },
     {
       label: "Settings",

@@ -55,10 +55,17 @@ function CameraFeed({
               JSON.stringify(zone)
             );
 
-            const response = await axios.post(
-              "http://localhost:5000/api/analyze",
-              formData
-            );
+            const token = localStorage.getItem("token");
+
+const response = await axios.post(
+  "http://localhost:5000/api/analyze",
+  formData,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
 
             if (isMounted) {
               setDetectedObject(
@@ -222,7 +229,7 @@ function CameraFeed({
             >
               <div className="detection-label">
                 <span>
-                  {b.label}
+                  {b.displayLabel || b.label}
                 </span>
 
                 <span>

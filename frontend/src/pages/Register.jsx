@@ -33,45 +33,254 @@ function Register() {
     };
   }, []);
 
-  const startFaceScan = async () => {
-    try {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
+const startFaceScan = async () => {
+  try {
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: {
+            ideal: 640,
+          },
+          height: {
+            ideal: 480,
+          },
+        },
+        audio: false,
+      });
 
-      streamRef.current = stream;
+    streamRef.current = stream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+    if (!videoRef.current) {
+      alert("Camera preview is not ready.");
+      return;
+    }
+
+    const video = videoRef.current;
+
+    video.srcObject = stream;
+
+    /*
+     * Wait until the camera actually provides
+     * video dimensions.
+     */
+    await new Promise((resolve) => {
+
+      if (
+        video.readyState >= 2 &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
+      ) {
+        resolve();
+        return;
       }
 
-      setScanning(true);
+      video.onloadedmetadata = () => {
+        video.play().then(() => {
+          resolve();
+        });
+      };
 
-      // Frontend demo scan
-      setTimeout(() => {
-        setScanning(false);
-        setFaceScanned(true);
+    });
 
-        if (streamRef.current) {
-          streamRef.current
-            .getTracks()
-            .forEach((track) => track.stop());
-        }
-      }, 3000);
+    setScanning(true);
+    setFaceScanned(false);
 
-    } catch (error) {
-      console.error(
-        "Camera access error:",
-        error
+    const capturedImages = [];
+
+    console.log(
+      "Camera ready:",
+      video.videoWidth,
+      "x",
+      video.videoHeight
+    );
+
+    /*
+     * Capture 30 samples
+     */
+
+    for (let i = 0; i < 30; i++) {
+
+      const canvas =
+        document.createElement("canvas");
+
+      canvas.width =
+        video.videoWidth;
+
+      canvas.height =
+        video.videoHeight;
+
+      const context =
+        canvas.getContext("2d");
+
+      context.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
       );
+
+      const blob =
+        await new Promise((resolve) => {
+
+          canvas.toBlob(
+            resolve,
+            "image/jpeg",
+            0.85
+          );
+
+        });
+
+      if (blob) {
+
+        capturedImages.push(blob);
+
+        console.log(
+          `Captured sample ${i + 1}/30`
+        );
+
+      }
+
+      /*
+       * Wait 500ms between captures
+       */
+
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            500
+          )
+      );
+
+    }
+
+    console.log(
+      "Total captured:",
+      capturedImages.length
+    );
+
+    /*
+     * Stop camera
+     */
+
+    if (streamRef.current) {
+
+      streamRef.current
+        .getTracks()
+        .forEach((track) =>
+          track.stop()
+        );
+
+      streamRef.current = null;
+
+    }
+
+    /*
+     * Check samples
+     */
+
+    if (
+      capturedImages.length < 10
+    ) {
 
       alert(
-        "Camera access was denied or is unavailable."
+        "Unable to capture enough face samples. Please try again."
       );
+
+      setScanning(false);
+
+      return;
     }
-  };
+
+    /*
+     * Send images to FastAPI
+     */
+
+    const formData =
+      new FormData();
+
+    capturedImages.forEach(
+      (image, index) => {
+
+        formData.append(
+          "files",
+          image,
+          `face_${index}.jpg`
+        );
+
+      }
+    );
+
+    console.log(
+      "Sending face samples to AI service..."
+    );
+
+    const response =
+      await axios.post(
+        "http://127.0.0.1:8000/enroll-owner",
+        formData
+      );
+
+    console.log(
+      "AI enrollment response:",
+      response.data
+    );
+
+    if (
+      response.data.success
+    ) {
+
+      setFaceScanned(true);
+
+      alert(
+        `Face enrollment successful. ${response.data.samples} samples saved.`
+      );
+
+    } else {
+
+      setFaceScanned(false);
+
+      alert(
+        response.data.message ||
+        "Face enrollment failed."
+      );
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Face enrollment error:",
+      error
+    );
+
+    setFaceScanned(false);
+
+    alert(
+      error.response?.data?.message ||
+      "Face enrollment failed. Please try again."
+    );
+
+  } finally {
+
+    if (streamRef.current) {
+
+      streamRef.current
+        .getTracks()
+        .forEach((track) =>
+          track.stop()
+        );
+
+      streamRef.current = null;
+
+    }
+
+    setScanning(false);
+
+  }
+};
 
   const nextStep = () => {
     if (step === 1) {
@@ -138,8 +347,29 @@ function Register() {
     );
   };
 
- const completeRegistration = async () => {
+const completeRegistration = async () => {
   try {
+
+    /* -----------------------------------------
+       MAKE SURE FACE ENROLLMENT WAS COMPLETED
+       ----------------------------------------- */
+
+    if (!faceScanned) {
+
+      alert(
+        "Please complete the face scan before registering."
+      );
+
+      return;
+    }
+
+    console.log(
+      "Face enrollment verified. Creating owner account..."
+    );
+
+    /* -----------------------------------------
+       CREATE USER ACCOUNT
+       ----------------------------------------- */
 
     const response = await axios.post(
       "http://localhost:5000/api/auth/register",
@@ -148,11 +378,23 @@ function Register() {
         email,
         password,
         location,
-        faceScanned,
+        faceScanned: true,
       }
     );
 
-    alert(response.data.message);
+    console.log(
+      "Registration response:",
+      response.data
+    );
+
+    alert(
+      response.data.message ||
+      "Registration successful!"
+    );
+
+    /* -----------------------------------------
+       GO TO LOGIN
+       ----------------------------------------- */
 
     window.location.href = "/login";
 
@@ -490,14 +732,16 @@ function Register() {
                   </div>
                 )}
 
-                {scanning && (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="face-video"
-                  />
-                )}
+               <video
+  ref={videoRef}
+  autoPlay
+  playsInline
+  muted
+  className="face-video"
+  style={{
+    display: scanning ? "block" : "none",
+  }}
+/>
 
                 {faceScanned && (
                   <div className="face-success">

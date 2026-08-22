@@ -473,22 +473,18 @@ app.put(
 /* =========================================================
    AI ANALYZE
    ========================================================= */
-
+   
+ 
 app.post(
   "/api/analyze",
+  authMiddleware,
   upload.single("image"),
-
   async (req, res) => {
 
-    let detectedObject =
-      "none";
-
+    let detectedObject = "none";
     let confidence = 0;
-
     let harmful = false;
-
-    let threatLevel =
-      "SAFE";
+    let threatLevel = "SAFE";
 
     try {
 
@@ -496,96 +492,68 @@ app.post(
          SYSTEM MONITORING OFF
          ----------------------------------------------- */
 
-      if (
-        !settings.monitoring
-      ) {
+      if (!settings.monitoring) {
 
         return res.json({
 
-          detectedObject:
-            "none",
+          detectedObject: "none",
 
-          confidence:
-            0,
+          confidence: 0,
 
-          harmful:
-            false,
+          harmful: false,
 
-          threatLevel:
-            "SAFE",
+          threatLevel: "SAFE",
 
-          siren:
-            false,
+          // Siren must be OFF when monitoring is OFF
+          siren: false,
 
-          allDetections:
-            [],
+          allDetections: [],
 
-          imageWidth:
-            640,
+          imageWidth: 640,
 
-          imageHeight:
-            480,
+          imageHeight: 480,
 
-          monitoring:
-            false
+          monitoring: false
         });
       }
 
-      const crop =
-        (
-          req.body.crop ||
-          "wheat"
-        ).toLowerCase();
+      const crop = (
+        req.body.crop || "wheat"
+      ).toLowerCase();
 
-      const zone =
-        req.body.zone
-          ? JSON.parse(
-              req.body.zone
-            )
-          : null;
+      const zone = req.body.zone
+        ? JSON.parse(req.body.zone)
+        : null;
 
-      const now =
-        Date.now();
+      const now = Date.now();
 
       /* -----------------------------------------------
          SEND IMAGE TO AI SERVICE
          ----------------------------------------------- */
 
-      const formData =
-        new FormData();
+      const formData = new FormData();
 
       formData.append(
         "file",
-
-        fs.createReadStream(
-          req.file.path
-        )
+        fs.createReadStream(req.file.path)
       );
 
-      const response =
-        await axios.post(
-
-          "http://127.0.0.1:8000/detect",
-
-          formData,
-
-          {
-            headers:
-              formData.getHeaders()
-          }
-        );
+      const response = await axios.post(
+        "http://127.0.0.1:8000/detect",
+        formData,
+        {
+          headers: formData.getHeaders()
+        }
+      );
 
       const detections =
-        response.data.detections ||
-        [];
+        response.data.detections || [];
 
       const imgW =
-        response.data.imageWidth ||
-        640;
+        response.data.imageWidth || 640;
 
       const imgH =
-        response.data.imageHeight ||
-        480;
+        response.data.imageHeight || 480;
 
       /* -----------------------------------------------
          CROP ZONE
@@ -780,7 +748,13 @@ app.post(
         ) {
 
           detectedObject =
-            harmfulDetection.label;
+  harmfulDetection.label === "person"
+    ? (
+        harmfulDetection.isOwner === true
+          ? "OWNER"
+          : "STRANGER"
+      )
+    : harmfulDetection.label;
 
           confidence =
             harmfulDetection.confidence;
@@ -817,9 +791,16 @@ app.post(
                   ? a
                   : b
             );
+              
 
-          detectedObject =
-            topDetection.label;
+            detectedObject =
+  topDetection.label === "person"
+    ? (
+        topDetection.isOwner === true
+          ? "OWNER"
+          : "STRANGER"
+      )
+    : topDetection.label;
 
           confidence =
             topDetection.confidence;
@@ -895,7 +876,13 @@ app.post(
         await Log.create({
 
           object:
-            sighting.label,
+  sighting.label === "person"
+    ? (
+        sighting.isOwner === true
+          ? "OWNER"
+          : "STRANGER"
+      )
+    : sighting.label,
 
           crop,
 
@@ -934,20 +921,29 @@ app.post(
           settings.emailAlerts
         ) {
 
-          console.log(
-            "Triggering email for:",
-            sighting.label
-          );
+         const alertObject =
+  sighting.label === "person"
+    ? (
+        sighting.isOwner === true
+          ? "OWNER"
+          : "STRANGER"
+      )
+    : sighting.label;
 
-          await sendAlertEmail(
+console.log(
+  "Triggering email for:",
+  alertObject
+);
 
-            sighting.label,
+await sendAlertEmail(
 
-            crop,
+  alertObject,
 
-            "WARNING",
+  crop,
 
-            req.file.path
+  "WARNING",
+
+  req.file.path
 
           );
         }
@@ -957,28 +953,37 @@ app.post(
          ANNOTATED DETECTIONS
          ----------------------------------------------- */
 
-      const annotatedDetections =
-        zoneDetections.map(
-          (d) => ({
+ const annotatedDetections =
+  zoneDetections.map(
+    (d) => ({
 
-            ...d,
+      ...d,
 
-            isHarmful:
+      displayLabel:
+        d.label === "person"
+          ? (
+              d.isOwner === true
+                ? "OWNER"
+                : "STRANGER"
+            )
+          : d.label,
 
-              d.label ===
-              "person"
+      isHarmful:
 
-                ? d.isOwner ===
-                  false
+        d.label ===
+        "person"
 
-                : rulesCache[
-                    crop
-                  ]?.includes(
-                    d.label.toLowerCase()
-                  ) || false
+          ? d.isOwner ===
+            false
 
-          })
-        );
+          : rulesCache[
+              crop
+            ]?.includes(
+              d.label.toLowerCase()
+            ) || false
+
+    })
+  );
 
       /* -----------------------------------------------
          RESPONSE

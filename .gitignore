@@ -61,3 +61,6 @@ runs/
 training/comparison_output/
 training/weak_classes_raw/
 training/*.zip
+
+ai-service/owner_data/
+ai-service/owner_model.yml

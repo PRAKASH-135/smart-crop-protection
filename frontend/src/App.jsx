@@ -13,6 +13,7 @@ import Logs from "./pages/Logs";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import CropRules from "./pages/CropRules";
 import Settings from "./pages/Settings";
+import Setup from "./pages/Setup";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -63,6 +64,7 @@ function App() {
               path="/"
               element={<Dashboard />}
             />
+            <Route path="/setup" element={<Setup />} />
 
             <Route
               path="/logs"
@@ -83,6 +85,7 @@ function App() {
               path="/settings"
               element={<Settings />}
             />
+            
 
           </Route>
 
