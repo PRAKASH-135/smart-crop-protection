@@ -1,11 +1,10 @@
 import { useState } from "react";
+
 import StatRow from "../components/StatRow";
 import ThreatCharts from "../components/ThreatCharts";
 import Topbar from "../components/Topbar";
 import CameraFeed from "../components/CameraFeed";
 import DetectionCard from "../components/DetectionCard";
-import LogsTable from "../components/LogsTable";
-import Analytics from "../components/Analytics";
 
 function Dashboard() {
   const [detectedObject, setDetectedObject] = useState("");
@@ -15,16 +14,21 @@ function Dashboard() {
   const [crop, setCrop] = useState("wheat");
 
   return (
-    <div className="p-6 overflow-auto bg-[#07111f] text-white min-h-screen">
-           <Topbar
+    <div className="dashboard-page">
+
+      {/* Header + Crop Selection */}
+      <Topbar
         crop={crop}
         setCrop={setCrop}
       />
-      <div className="mt-4">
-        <StatRow />
-      </div>
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        <div className="col-span-2">
+
+      {/* Statistics */}
+      <StatRow />
+
+      {/* Live Camera + Current Detection */}
+      <div className="dashboard-main-grid">
+
+        <div className="glass-panel rounded-[20px] overflow-hidden">
           <CameraFeed
             setDetectedObject={setDetectedObject}
             setConfidence={setConfidence}
@@ -33,26 +37,31 @@ function Dashboard() {
             crop={crop}
           />
         </div>
-        <div>
-                    <DetectionCard
-            detectedObject={detectedObject}
-            confidence={confidence}
-            siren={siren}
-            crop={crop}
-          />
-        </div>
+
+        <DetectionCard
+          detectedObject={detectedObject}
+          confidence={confidence}
+          siren={siren}
+          crop={crop}
+        />
+
       </div>
-            <div className="grid grid-cols-3 gap-4 mt-4">
-        <div className="col-span-2">
-          <LogsTable logs={logs} />
+
+      {/* Large Analytics Row */}
+      <div className="dashboard-charts-grid">
+
+        {/* 50% - Threat Distribution */}
+        <div className="glass-panel dashboard-chart-panel">
+          <ThreatCharts type="distribution" />
         </div>
-        <div>
-          <Analytics />
+
+        {/* 50% - Detections This Week */}
+        <div className="glass-panel dashboard-chart-panel">
+          <ThreatCharts type="weekly" />
         </div>
+
       </div>
-      <div className="mt-4">
-        <ThreatCharts />
-      </div>
+
     </div>
   );
 }
