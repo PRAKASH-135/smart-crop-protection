@@ -1,6 +1,3 @@
-
-readme = r"""# AI-Based Smart Crop Protection & Intelligent Intrusion Alert System
-
 An AI-powered smart agriculture system designed to protect crop fields by detecting animals and people in real time, identifying whether a detected person is the registered owner or a stranger, checking whether the detection is inside/outside the protected crop zone, and triggering alerts when a harmful intrusion is detected.
 
 ## Project Overview
