@@ -5727,3 +5727,42 @@
   height: auto;
   border-radius: 18px;
 }
+
+/* =========================================================
+   BROWSER AUTOFILL FIX
+   Keeps Login/Register inputs consistent with dark theme
+   ========================================================= */
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-text-fill-color: #f5f7f6 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #031d19 inset !important;
+  box-shadow: 0 0 0px 1000px #031d19 inset !important;
+  background-color: #031d19 !important;
+  caret-color: #f5f7f6 !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Input text and placeholder */
+input,
+textarea,
+select {
+  color: #f5f7f6;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8ba7a1;
+  opacity: 1;
+}
+

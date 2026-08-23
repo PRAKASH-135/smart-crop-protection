@@ -8,8 +8,6 @@ function Register() {
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
 
-  
-
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -23,268 +21,287 @@ function Register() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
+  /* =====================================================
+     CLEANUP CAMERA
+     ===================================================== */
+
   useEffect(() => {
     return () => {
       if (streamRef.current) {
         streamRef.current
           .getTracks()
           .forEach((track) => track.stop());
+
+        streamRef.current = null;
       }
     };
   }, []);
 
-const startFaceScan = async () => {
-  try {
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: {
-            ideal: 640,
-          },
-          height: {
-            ideal: 480,
-          },
-        },
-        audio: false,
-      });
+  /* =====================================================
+     START FACE SCAN
+     ===================================================== */
 
-    streamRef.current = stream;
-
-    if (!videoRef.current) {
-      alert("Camera preview is not ready.");
-      return;
-    }
-
-    const video = videoRef.current;
-
-    video.srcObject = stream;
-
-    /*
-     * Wait until the camera actually provides
-     * video dimensions.
-     */
-    await new Promise((resolve) => {
+  const startFaceScan = async () => {
+    try {
+      setScanning(true);
+      setFaceScanned(false);
 
       if (
-        video.readyState >= 2 &&
-        video.videoWidth > 0 &&
-        video.videoHeight > 0
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
       ) {
-        resolve();
+        alert(
+          "Camera access is not supported by this browser."
+        );
+
+        setScanning(false);
         return;
       }
 
-      video.onloadedmetadata = () => {
-        video.play().then(() => {
-          resolve();
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: {
+              ideal: 640,
+            },
+            height: {
+              ideal: 480,
+            },
+          },
+          audio: false,
         });
-      };
 
-    });
+      streamRef.current = stream;
 
-    setScanning(true);
-    setFaceScanned(false);
+      if (!videoRef.current) {
+        alert("Camera preview is not ready.");
 
-    const capturedImages = [];
+        stream
+          .getTracks()
+          .forEach((track) => track.stop());
 
-    console.log(
-      "Camera ready:",
-      video.videoWidth,
-      "x",
-      video.videoHeight
-    );
+        streamRef.current = null;
+        setScanning(false);
 
-    /*
-     * Capture 30 samples
-     */
+        return;
+      }
 
-    for (let i = 0; i < 30; i++) {
+      const video = videoRef.current;
 
-      const canvas =
-        document.createElement("canvas");
+      video.srcObject = stream;
 
-      canvas.width =
-        video.videoWidth;
+      /* ---------------------------------------------
+         Wait for camera metadata
+         --------------------------------------------- */
 
-      canvas.height =
-        video.videoHeight;
+      await new Promise((resolve, reject) => {
+        if (
+          video.readyState >= 2 &&
+          video.videoWidth > 0 &&
+          video.videoHeight > 0
+        ) {
+          video
+            .play()
+            .then(resolve)
+            .catch(reject);
 
-      const context =
-        canvas.getContext("2d");
+          return;
+        }
 
-      context.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
+        video.onloadedmetadata = async () => {
+          try {
+            await video.play();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+      });
+
+      const capturedImages = [];
+
+      console.log(
+        "Camera ready:",
+        video.videoWidth,
+        "x",
+        video.videoHeight
       );
 
-      const blob =
-        await new Promise((resolve) => {
+      /* ---------------------------------------------
+         Capture 30 face samples
+         --------------------------------------------- */
 
-          canvas.toBlob(
-            resolve,
-            "image/jpeg",
-            0.85
+      for (let i = 0; i < 30; i++) {
+        const canvas =
+          document.createElement("canvas");
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context =
+          canvas.getContext("2d");
+
+        if (!context) {
+          continue;
+        }
+
+        context.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        const blob =
+          await new Promise((resolve) => {
+            canvas.toBlob(
+              resolve,
+              "image/jpeg",
+              0.85
+            );
+          });
+
+        if (blob) {
+          capturedImages.push(blob);
+
+          console.log(
+            `Captured sample ${i + 1}/30`
           );
+        }
 
-        });
-
-      if (blob) {
-
-        capturedImages.push(blob);
-
-        console.log(
-          `Captured sample ${i + 1}/30`
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500)
         );
-
       }
 
-      /*
-       * Wait 500ms between captures
-       */
-
-      await new Promise(
-        (resolve) =>
-          setTimeout(
-            resolve,
-            500
-          )
+      console.log(
+        "Total captured:",
+        capturedImages.length
       );
 
-    }
+      /* ---------------------------------------------
+         Stop camera
+         --------------------------------------------- */
 
-    console.log(
-      "Total captured:",
-      capturedImages.length
-    );
+      if (streamRef.current) {
+        streamRef.current
+          .getTracks()
+          .forEach((track) => track.stop());
 
-    /*
-     * Stop camera
-     */
-
-    if (streamRef.current) {
-
-      streamRef.current
-        .getTracks()
-        .forEach((track) =>
-          track.stop()
-        );
-
-      streamRef.current = null;
-
-    }
-
-    /*
-     * Check samples
-     */
-
-    if (
-      capturedImages.length < 10
-    ) {
-
-      alert(
-        "Unable to capture enough face samples. Please try again."
-      );
-
-      setScanning(false);
-
-      return;
-    }
-
-    /*
-     * Send images to FastAPI
-     */
-
-    const formData =
-      new FormData();
-
-    capturedImages.forEach(
-      (image, index) => {
-
-        formData.append(
-          "files",
-          image,
-          `face_${index}.jpg`
-        );
-
+        streamRef.current = null;
       }
-    );
 
-    console.log(
-      "Sending face samples to AI service..."
-    );
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
 
-    const response =
-      await axios.post(
-        "http://127.0.0.1:8000/enroll-owner",
-        formData
+      /* ---------------------------------------------
+         Check samples
+         --------------------------------------------- */
+
+      if (capturedImages.length < 10) {
+        alert(
+          "Unable to capture enough face samples. Please try again."
+        );
+
+        setFaceScanned(false);
+        setScanning(false);
+
+        return;
+      }
+
+      /* ---------------------------------------------
+         Create FormData
+         --------------------------------------------- */
+
+      const formData = new FormData();
+
+      capturedImages.forEach(
+        (image, index) => {
+          formData.append(
+            "files",
+            image,
+            `face_${index}.jpg`
+          );
+        }
       );
 
-    console.log(
-      "AI enrollment response:",
-      response.data
-    );
-
-    if (
-      response.data.success
-    ) {
-
-      setFaceScanned(true);
-
-      alert(
-        `Face enrollment successful. ${response.data.samples} samples saved.`
+      console.log(
+        "Sending face samples to AI service..."
       );
 
-    } else {
+      /* ---------------------------------------------
+         Send to FastAPI
+         --------------------------------------------- */
+
+      const response =
+        await axios.post(
+          "http://127.0.0.1:8000/enroll-owner",
+          formData
+        );
+
+      console.log(
+        "AI enrollment response:",
+        response.data
+      );
+
+      /* ---------------------------------------------
+         Handle response
+         --------------------------------------------- */
+
+      if (response.data.success) {
+        setFaceScanned(true);
+
+        alert(
+          `Face enrollment successful. ${response.data.samples} samples saved.`
+        );
+      } else {
+        setFaceScanned(false);
+
+        alert(
+          response.data.message ||
+          "Face enrollment failed."
+        );
+      }
+
+    } catch (error) {
+      console.error(
+        "Face enrollment error:",
+        error
+      );
 
       setFaceScanned(false);
 
       alert(
-        response.data.message ||
-        "Face enrollment failed."
+        error.response?.data?.message ||
+        "Face enrollment failed. Please try again."
       );
 
+    } finally {
+      if (streamRef.current) {
+        streamRef.current
+          .getTracks()
+          .forEach((track) => track.stop());
+
+        streamRef.current = null;
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+
+      setScanning(false);
     }
+  };
 
-  } catch (error) {
-
-    console.error(
-      "Face enrollment error:",
-      error
-    );
-
-    setFaceScanned(false);
-
-    alert(
-      error.response?.data?.message ||
-      "Face enrollment failed. Please try again."
-    );
-
-  } finally {
-
-    if (streamRef.current) {
-
-      streamRef.current
-        .getTracks()
-        .forEach((track) =>
-          track.stop()
-        );
-
-      streamRef.current = null;
-
-    }
-
-    setScanning(false);
-
-  }
-};
+  /* =====================================================
+     NEXT STEP
+     ===================================================== */
 
   const nextStep = () => {
     if (step === 1) {
-
       if (!name.trim()) {
         alert("Please enter your name.");
         return;
@@ -341,89 +358,84 @@ const startFaceScan = async () => {
     );
   };
 
+  /* =====================================================
+     PREVIOUS STEP
+     ===================================================== */
+
   const previousStep = () => {
     setStep((current) =>
       Math.max(current - 1, 1)
     );
   };
 
-const completeRegistration = async () => {
-  try {
+  /* =====================================================
+     COMPLETE REGISTRATION
+     ===================================================== */
 
-    /* -----------------------------------------
-       MAKE SURE FACE ENROLLMENT WAS COMPLETED
-       ----------------------------------------- */
+  const completeRegistration = async () => {
+    try {
+      if (!faceScanned) {
+        alert(
+          "Please complete the face scan before registering."
+        );
 
-    if (!faceScanned) {
+        return;
+      }
 
-      alert(
-        "Please complete the face scan before registering."
+      console.log(
+        "Face enrollment verified. Creating owner account..."
       );
 
-      return;
+      const response =
+        await axios.post(
+          "http://localhost:5000/api/auth/register",
+          {
+            name,
+            email,
+            password,
+            location,
+            faceScanned: true,
+          }
+        );
+
+      console.log(
+        "Registration response:",
+        response.data
+      );
+
+      alert(
+        response.data.message ||
+        "Registration successful!"
+      );
+
+      window.location.href = "/login";
+
+    } catch (error) {
+      console.error(
+        "Registration error:",
+        error
+      );
+
+      alert(
+        error.response?.data?.error ||
+        "Registration failed. Please try again."
+      );
     }
-
-    console.log(
-      "Face enrollment verified. Creating owner account..."
-    );
-
-    /* -----------------------------------------
-       CREATE USER ACCOUNT
-       ----------------------------------------- */
-
-    const response = await axios.post(
-      "http://localhost:5000/api/auth/register",
-      {
-        name,
-        email,
-        password,
-        location,
-        faceScanned: true,
-      }
-    );
-
-    console.log(
-      "Registration response:",
-      response.data
-    );
-
-    alert(
-      response.data.message ||
-      "Registration successful!"
-    );
-
-    /* -----------------------------------------
-       GO TO LOGIN
-       ----------------------------------------- */
-
-    window.location.href = "/login";
-
-  } catch (error) {
-
-    console.error(
-      "Registration error:",
-      error
-    );
-
-    alert(
-      error.response?.data?.error ||
-      "Registration failed. Please try again."
-    );
-  }
-};
+  };
 
   return (
     <div className="register-page">
-
-      {/* Background */}
 
       <div className="register-bg" />
 
       <div className="register-content">
 
-        {/* Back to Login */}
+        {/* =================================================
+            BACK TO LOGIN
+            ================================================= */}
 
         <button
+          type="button"
           className="register-back"
           onClick={() =>
             window.location.href = "/login"
@@ -432,7 +444,9 @@ const completeRegistration = async () => {
           ← Back to Login
         </button>
 
-        {/* BRAND */}
+        {/* =================================================
+            BRAND
+            ================================================= */}
 
         <div className="register-brand">
 
@@ -450,7 +464,9 @@ const completeRegistration = async () => {
 
         </div>
 
-        {/* STEPS */}
+        {/* =================================================
+            STEPS
+            ================================================= */}
 
         <div className="register-steps">
 
@@ -460,7 +476,6 @@ const completeRegistration = async () => {
             "Review",
             "Complete",
           ].map((title, index) => {
-
             const number = index + 1;
 
             return (
@@ -507,7 +522,7 @@ const completeRegistration = async () => {
 
         {/* =================================================
             STEP 1
-           ================================================= */}
+            ================================================= */}
 
         {step === 1 && (
 
@@ -530,7 +545,7 @@ const completeRegistration = async () => {
 
               <div className="register-field">
 
-                <label>
+                <label htmlFor="owner-name">
                   Name
                 </label>
 
@@ -539,7 +554,10 @@ const completeRegistration = async () => {
                   <span>♙</span>
 
                   <input
+                    id="owner-name"
                     type="text"
+                    name="name"
+                    autoComplete="name"
                     placeholder="Enter your full name"
                     value={name}
                     onChange={(e) =>
@@ -555,7 +573,7 @@ const completeRegistration = async () => {
 
               <div className="register-field">
 
-                <label>
+                <label htmlFor="owner-email">
                   Email
                 </label>
 
@@ -564,7 +582,10 @@ const completeRegistration = async () => {
                   <span>✉</span>
 
                   <input
+                    id="owner-email"
                     type="email"
+                    name="email"
+                    autoComplete="email"
                     placeholder="Enter your email address"
                     value={email}
                     onChange={(e) =>
@@ -580,7 +601,7 @@ const completeRegistration = async () => {
 
               <div className="register-field">
 
-                <label>
+                <label htmlFor="owner-password">
                   Password
                 </label>
 
@@ -589,11 +610,14 @@ const completeRegistration = async () => {
                   <span>🔒</span>
 
                   <input
+                    id="owner-password"
                     type={
                       showPassword
                         ? "text"
                         : "password"
                     }
+                    name="password"
+                    autoComplete="new-password"
                     placeholder="Create a password"
                     value={password}
                     onChange={(e) =>
@@ -629,7 +653,7 @@ const completeRegistration = async () => {
 
               <div className="register-field">
 
-                <label>
+                <label htmlFor="confirm-password">
                   Confirm Password
                 </label>
 
@@ -638,11 +662,14 @@ const completeRegistration = async () => {
                   <span>🔒</span>
 
                   <input
+                    id="confirm-password"
                     type={
                       showConfirmPassword
                         ? "text"
                         : "password"
                     }
+                    name="confirmPassword"
+                    autoComplete="new-password"
                     placeholder="Confirm your password"
                     value={confirmPassword}
                     onChange={(e) =>
@@ -680,7 +707,7 @@ const completeRegistration = async () => {
 
               <div className="register-field">
 
-                <label>
+                <label htmlFor="system-location">
                   System Location
                 </label>
 
@@ -689,7 +716,10 @@ const completeRegistration = async () => {
                   <span>⌖</span>
 
                   <input
+                    id="system-location"
                     type="text"
+                    name="location"
+                    autoComplete="address-line1"
                     placeholder="Enter system / farm location"
                     value={location}
                     onChange={(e) =>
@@ -708,7 +738,9 @@ const completeRegistration = async () => {
 
             </div>
 
-            {/* FACE SCAN */}
+            {/* =================================================
+                FACE SCAN
+                ================================================= */}
 
             <div className="register-face-section">
 
@@ -732,16 +764,18 @@ const completeRegistration = async () => {
                   </div>
                 )}
 
-               <video
-  ref={videoRef}
-  autoPlay
-  playsInline
-  muted
-  className="face-video"
-  style={{
-    display: scanning ? "block" : "none",
-  }}
-/>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="face-video"
+                  style={{
+                    display: scanning
+                      ? "block"
+                      : "none",
+                  }}
+                />
 
                 {faceScanned && (
                   <div className="face-success">
@@ -777,6 +811,7 @@ const completeRegistration = async () => {
 
               {!faceScanned && (
                 <button
+                  type="button"
                   className="face-scan-button"
                   onClick={startFaceScan}
                   disabled={scanning}
@@ -801,6 +836,7 @@ const completeRegistration = async () => {
             <div className="register-actions">
 
               <button
+                type="button"
                 className="register-next"
                 onClick={nextStep}
               >
@@ -814,7 +850,7 @@ const completeRegistration = async () => {
 
         {/* =================================================
             STEP 2
-           ================================================= */}
+            ================================================= */}
 
         {step === 2 && (
 
@@ -844,6 +880,7 @@ const completeRegistration = async () => {
             <div className="register-actions">
 
               <button
+                type="button"
                 className="register-secondary"
                 onClick={previousStep}
               >
@@ -851,6 +888,7 @@ const completeRegistration = async () => {
               </button>
 
               <button
+                type="button"
                 className="register-next"
                 onClick={nextStep}
               >
@@ -864,7 +902,7 @@ const completeRegistration = async () => {
 
         {/* =================================================
             STEP 3
-           ================================================= */}
+            ================================================= */}
 
         {step === 3 && (
 
@@ -898,6 +936,7 @@ const completeRegistration = async () => {
 
               <div>
                 <span>Face Scan</span>
+
                 <strong className="review-green">
                   ✓ Completed
                 </strong>
@@ -908,6 +947,7 @@ const completeRegistration = async () => {
             <div className="register-actions">
 
               <button
+                type="button"
                 className="register-secondary"
                 onClick={previousStep}
               >
@@ -915,6 +955,7 @@ const completeRegistration = async () => {
               </button>
 
               <button
+                type="button"
                 className="register-next"
                 onClick={nextStep}
               >
@@ -928,7 +969,7 @@ const completeRegistration = async () => {
 
         {/* =================================================
             STEP 4
-           ================================================= */}
+            ================================================= */}
 
         {step === 4 && (
 
@@ -948,6 +989,7 @@ const completeRegistration = async () => {
             </p>
 
             <button
+              type="button"
               className="register-next"
               onClick={completeRegistration}
             >
