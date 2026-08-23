@@ -1,6 +1,9 @@
 function LogsTable({ logs = [], onSelectLog }) {
   const emojiFor = (obj) => {
     const map = {
+      owner: "👨‍🌾",
+      stranger: "🚨",
+
       person: "🧑",
       cow: "🐄",
       monkey: "🐒",
@@ -12,6 +15,7 @@ function LogsTable({ logs = [], onSelectLog }) {
       cat: "🐈",
       horse: "🐎",
       sheep: "🐑",
+
       none: "—",
     };
 
@@ -59,7 +63,9 @@ function LogsTable({ logs = [], onSelectLog }) {
     <section className="logs-panel">
 
       <div className="logs-header">
+
         <div>
+
           <h2 className="logs-title">
             Detection Logs
           </h2>
@@ -67,17 +73,20 @@ function LogsTable({ logs = [], onSelectLog }) {
           <p className="logs-subtitle">
             Monitor and review recent AI detections
           </p>
+
         </div>
 
         <div className="logs-count">
           <span>{logs.length}</span>
           Recent Records
         </div>
+
       </div>
 
       {logs.length === 0 ? (
 
         <div className="logs-empty">
+
           <div className="logs-empty-icon">
             🔍
           </div>
@@ -90,6 +99,7 @@ function LogsTable({ logs = [], onSelectLog }) {
             Detection records will appear here
             when the AI system identifies an object.
           </p>
+
         </div>
 
       ) : (
@@ -99,6 +109,7 @@ function LogsTable({ logs = [], onSelectLog }) {
           <table className="logs-table">
 
             <thead>
+
               <tr>
                 <th>Object</th>
                 <th>Crop</th>
@@ -108,6 +119,7 @@ function LogsTable({ logs = [], onSelectLog }) {
                 <th>Siren</th>
                 <th>Time</th>
               </tr>
+
             </thead>
 
             <tbody>
@@ -121,6 +133,7 @@ function LogsTable({ logs = [], onSelectLog }) {
                   log.harmful === true;
 
                 return (
+
                   <tr
                     key={
                       log._id ||
@@ -132,7 +145,10 @@ function LogsTable({ logs = [], onSelectLog }) {
                     }
                   >
 
+                    {/* OBJECT */}
+
                     <td>
+
                       <div className="log-object">
 
                         <span className="log-object-icon">
@@ -148,21 +164,30 @@ function LogsTable({ logs = [], onSelectLog }) {
                           {log.trackId !==
                             undefined &&
                             log.trackId !== null && (
+
                               <span className="log-track-id">
                                 Track #{log.trackId}
                               </span>
+
                           )}
 
                         </div>
 
                       </div>
+
                     </td>
 
+                    {/* CROP */}
+
                     <td>
+
                       <span className="log-crop">
                         🌾 {log.crop || "—"}
                       </span>
+
                     </td>
+
+                    {/* CONFIDENCE */}
 
                     <td>
 
@@ -200,6 +225,8 @@ function LogsTable({ logs = [], onSelectLog }) {
 
                     </td>
 
+                    {/* THREAT LEVEL */}
+
                     <td>
 
                       <span
@@ -220,6 +247,8 @@ function LogsTable({ logs = [], onSelectLog }) {
 
                     </td>
 
+                    {/* STATUS */}
+
                     <td>
 
                       <span
@@ -229,12 +258,16 @@ function LogsTable({ logs = [], onSelectLog }) {
                             : "status-safe"
                         }`}
                       >
+
                         {isThreat
                           ? "Harmful"
                           : "Safe"}
+
                       </span>
 
                     </td>
+
+                    {/* SIREN */}
 
                     <td>
 
@@ -255,6 +288,8 @@ function LogsTable({ logs = [], onSelectLog }) {
 
                     </td>
 
+                    {/* TIME */}
+
                     <td>
 
                       <span className="log-time">
@@ -264,6 +299,7 @@ function LogsTable({ logs = [], onSelectLog }) {
                     </td>
 
                   </tr>
+
                 );
               })}
 
@@ -272,6 +308,7 @@ function LogsTable({ logs = [], onSelectLog }) {
           </table>
 
         </div>
+
       )}
 
     </section>

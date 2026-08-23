@@ -145,6 +145,7 @@ function Login() {
 
           <form
             onSubmit={handleLogin}
+            autoComplete="on"
           >
 
             {/* EMAIL */}
@@ -155,6 +156,8 @@ function Login() {
 
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               placeholder="Enter your email"
               value={email}
               onChange={(e) =>
@@ -178,6 +181,8 @@ function Login() {
                     ? "text"
                     : "password"
                 }
+                name="password"
+                autoComplete="current-password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) =>
@@ -210,6 +215,7 @@ function Login() {
 
                 <input
                   type="checkbox"
+                  name="remember"
                 />
 
                 <span>
@@ -253,12 +259,16 @@ function Login() {
 
           </div>
 
+          {/* GOOGLE */}
+
           <button
             type="button"
             className="social-button"
           >
             G&nbsp;&nbsp; Continue with Google
           </button>
+
+          {/* MICROSOFT */}
 
           <button
             type="button"
